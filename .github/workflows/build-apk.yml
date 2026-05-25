@@ -1,4 +1,4 @@
-name: Build InstaEducate1 APK
+name: Build InstaEducate APK
 
 on:
   push:
@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout Source Code
+    - name: Checkout code
       uses: actions/checkout@v4
 
     - name: Set up JDK 17
@@ -21,27 +21,31 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    - name: Grant Execute Permission for Gradle Wrapper
-      run: chmod +x gradlew
-      # If gradlew isn't initialized yet, we fall back to installing gradle
-      continue-on-error: true
+    - name: Set up Android SDK
+      uses: android-actions/setup-android@v3
+      with:
+        # Install API level 34 and build tools 34.0.0 (required by the app)
+        packages: "platforms;android-34 build-tools;34.0.0"
 
-    - name: Initialize Gradle Wrapper if Missing
+    # ----- Fix missing Gradle wrapper (without installing system Gradle) -----
+    - name: Restore missing Gradle wrapper JAR
       run: |
-        if [ ! -f "gradlew" ]; then
-          echo "Gradle wrapper not found, generating wrapper using gradle command..."
-          sudo apt-get update && sudo apt-get install -y gradle
-          gradle wrapper
-          chmod +x gradlew
+        if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+          echo "⚠️ gradle-wrapper.jar is missing – downloading it now"
+          mkdir -p gradle/wrapper
+          # Use the version declared in gradle-wrapper.properties (or default to 8.0)
+          wget https://github.com/gradle/gradle/raw/v8.0/gradle/wrapper/gradle-wrapper.jar \
+            -O gradle/wrapper/gradle-wrapper.jar
         fi
+        chmod +x gradlew
 
     - name: Build Debug APK
       run: ./gradlew assembleDebug --no-daemon
 
-    - name: Upload Built APK Artifact
+    - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
         name: InstaEducate-Debug-APK
-        path: app/build/outputs/apk/debug/app-debug.apk
+        path: app/build/outputs/apk/debug/*.apk
         if-no-files-found: error
         retention-days: 7
